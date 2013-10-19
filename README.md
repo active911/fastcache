@@ -65,6 +65,8 @@ int main(int argc, char **argv) {
 
 	cout << out->id << ":" << out->name << endl;
 
+	return 0;
+}
 ```
 
 ### Todo
