@@ -43,6 +43,15 @@ Again, DON'T MUTATE anything you put into or take out of the cache!! This is ver
 ### Example
 
 ```cpp
+#include <iostream>
+#include <string>
+#include <boost/shared_ptr.hpp>
+#include "Fastcache.h"
+
+using namespace std;
+using namespace active911;
+using boost::shared_ptr;
+
 class TestClass {
 public:
 	int id;

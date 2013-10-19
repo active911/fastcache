@@ -1,3 +1,4 @@
 *.o
 *.cfg
 tests
+example

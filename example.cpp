@@ -1,5 +1,3 @@
-
-
 #include <iostream>
 #include <string>
 #include <boost/shared_ptr.hpp>
@@ -10,38 +8,26 @@ using namespace active911;
 using boost::shared_ptr;
 
 class TestClass {
-
 public:
-	TestClass() {
-
-		cout<<"TestClass CONSTR"<<endl;
-	};
-	~TestClass() {
-
-		cout<<"TestClass DESTR"<<endl;
-	};
 	int id;
 	string name;
 };
 
 int main(int argc, char **argv) {
 
-	cout << "Starting" << endl;
-
-	// Make
+	// Make data for cache
 	shared_ptr<TestClass>in=shared_ptr<TestClass>(new TestClass());
 	in->id=23;
 	in->name="My name";
 
-	// Store
+	// Create cache as string->TestClass store.  Add data
 	Fastcache<string, TestClass>cache;
-	cache.set("99",in);
+	cache.set("MyDataKey",in);
 
-	// Fetch
-	shared_ptr<TestClass>out=cache.get("99");
+	// Fetch back
+	shared_ptr<TestClass>out=cache.get("MyDataKey");
 
 	cout << out->id << ":" << out->name << endl;
 
-	cout << "Ending" << endl;
 	return 0;
 }
