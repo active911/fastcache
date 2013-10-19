@@ -40,6 +40,33 @@ Again, DON'T MUTATE anything you put into or take out of the cache!! This is ver
 - Create all cache objects using boost::shared_ptr and then let them go out of scope as soon as you set them
 - When you get something from the cache, make a copy of the data (not just the pointer) before you do anything except read it
 
+### Example
+
+```cpp
+class TestClass {
+public:
+	int id;
+	string name;
+};
+
+int main(int argc, char **argv) {
+
+	// Make data for cache
+	shared_ptr<TestClass>in=shared_ptr<TestClass>(new TestClass());
+	in->id=23;
+	in->name="My name";
+
+	// Create cache as string->TestClass store.  Add data
+	Fastcache<string, TestClass>cache;
+	cache.set("MyDataKey",in);
+
+	// Fetch back
+	shared_ptr<TestClass>out=cache.get("MyDataKey");
+
+	cout << out->id << ":" << out->name << endl;
+
+```
+
 ### Todo
 
 Enforce non mutablility of objects in the cache somehow - perhaps add functions that copy data before and after storage, so as to relieve the user from haing to be careful? OTOH, there would be performance tradeoffs here...
