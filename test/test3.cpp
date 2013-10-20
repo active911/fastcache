@@ -7,6 +7,7 @@
 
 // Run with 30 threads
 #define THREAD_COUNT 30
+#define OBJECT_COUNT 1000
 #define FASTCACHE_TEST_SMALL
 
 // Clock source
@@ -43,7 +44,7 @@ struct timespec end;
 void load_cache(int thread_number) {
 
 	// Create a cache object 
-	for(int n=0; n<300; n++){
+	for(int n=0; n<OBJECT_COUNT; n++){
 
 		int key=thread_number*n;
 		shared_ptr<TestClass>obj=shared_ptr<TestClass>(new TestClass());
@@ -55,7 +56,7 @@ void load_cache(int thread_number) {
 void read_cache(int thread_number) {
 
 	// Read 
-	for(int n=0; n<300; n++){
+	for(int n=0; n<OBJECT_COUNT; n++){
 
 		int key=thread_number*n;
 		shared_ptr<TestClass>obj=cache.get(key);
@@ -71,6 +72,7 @@ int main(int argc, char **argv) {
 	cout.precision(5);
 
 	// Start load test
+	cout << "Testing with " << THREAD_COUNT << " simultaneous threads" << endl;
 	cout << "Object size is " << sizeof(TestClass) << " bytes" << endl;
 	cout << "Loading up cache..." << flush;
 	clock_gettime(CLOCKSRC, &start);
@@ -95,7 +97,7 @@ int main(int argc, char **argv) {
 	double end_time=(double)end.tv_sec+((double)end.tv_nsec/1000000000.0);
 	double elapsed_time=end_time-start_time;
 
-	cout << ( THREAD_COUNT * 300 ) << " objects stored in " << elapsed_time << " sec" << endl;
+	cout << ( THREAD_COUNT * OBJECT_COUNT ) << " objects stored in " << elapsed_time << " sec" << endl;
 	threads.clear();
 
 
@@ -122,7 +124,7 @@ int main(int argc, char **argv) {
 	end_time=(double)end.tv_sec+((double)end.tv_nsec/1000000000.0);
 	elapsed_time=end_time-start_time;
 
-	cout << ( THREAD_COUNT * 300 ) << " objects read in " << elapsed_time << " sec" << endl;
+	cout << ( THREAD_COUNT * OBJECT_COUNT ) << " objects read in " << elapsed_time << " sec" << endl;
 
 
 	return 0;

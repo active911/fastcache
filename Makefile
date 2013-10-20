@@ -19,5 +19,5 @@ example: example.o
 	$(CXX) $^ -o $@ -L/usr/local/lib 
 
 clean:
-	$(RM) *.o  test/*.o test/test1 test/test2 example
+	$(RM) *.o  test/*.o test/test1 test/test2 test/test3 example
 

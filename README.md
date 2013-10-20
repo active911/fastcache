@@ -2,6 +2,13 @@
 
 Wicked fast, thread safe in-memory key/object store for C++
 
+```
+Testing with 30 simultaneous threads
+Object size is 16 bytes
+Loading up cache...30000 objects stored in 0.027752 sec
+Reading cache...30000 objects read in 0.017265 sec
+```
+
 ### Introduction
 
 Sometimes using an external caching solution like memcached or Redis is just unnecessary. 
