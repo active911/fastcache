@@ -9,7 +9,9 @@
 #include <iostream>
 
 // Shard size.  This should be much larger than the number of threads likely to access the cache at any one time.
-#define FASTCACHE_SHARDSIZE 256u
+#ifndef FASTCACHE_SHARDSIZE
+	#define FASTCACHE_SHARDSIZE 256u
+#endif
 
 using boost::shared_ptr;
 using boost::mutex;
@@ -39,6 +41,9 @@ class Fastcache {
 
 			// Lock and write
 			mutex::scoped_lock lock(*this->guard);
+			#ifdef FASTCACHE_SLOW
+			sleep(1);
+			#endif
 			this->map[id]=val;
 
 		};
@@ -52,6 +57,9 @@ class Fastcache {
 
 			// Lock and read
 			mutex::scoped_lock lock(*this->guard);
+			#ifdef FASTCACHE_SLOW
+			sleep(1);
+			#endif
 			shared_ptr<T>val=this->map.at(id);			// Will throw std::out_of_range if not there!
 
 			return val;

@@ -8,13 +8,16 @@ DEP_HEAD := Fastcache.h
 all: tests example
 
 %.o: %.cpp $(DEP_HEAD)
-	$(CXX) -Wall -DHAVE_INTTYPES_H -DHAVE_NETINET_IN_H $(INC) -c $< -o $@
+	$(CXX) -Wall $(INC) -c $< -o $@
 
-tests: tests.o 
-	$(CXX) $^ -o $@ -L/usr/local/lib 
+tests: test1 test2 test3
+
+test%: test/test%.cpp
+	$(CXX) $^ -o test/$@ -L/usr/local/lib -lboost_thread
 
 example: example.o 
 	$(CXX) $^ -o $@ -L/usr/local/lib 
 
 clean:
-	$(RM) *.o  tests example
+	$(RM) *.o  test/*.o test/test1 test/test2 example
+
