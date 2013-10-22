@@ -24,9 +24,11 @@ int main(int argc, char **argv) {
 	in->id=23;
 	in->name="My name";
 
+
 	// Create cache as string->TestClass store.  Add data
 	Fastcache<string, TestClass>cache;
 	cache.set("MyDataKey",in);
+
 
 	// Fetch back
 	shared_ptr<TestClass>out=cache.get("MyDataKey");

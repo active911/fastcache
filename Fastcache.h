@@ -7,6 +7,7 @@
 #include <boost/functional/hash.hpp>
 #include <boost/detail/atomic_count.hpp>
 #include <vector>
+#include <iterator>
 #include <map>
 #include <iostream>
 #include <time.h>
@@ -103,13 +104,39 @@ public:
 		#ifdef FASTCACHE_SLOW
 		sleep(1);
 		#endif
-		shard->map.insert(std::pair<Key,shared_ptr<CacheItem<T> > >(id,item));	//TODO... use .emplace() once we have C++11 !! (may be faster)
 
+//std::map<Key,shared_ptr<CacheItem<T> > >::iterator
+
+//		std::pair<std::iterator<std::pair<Key, shared_ptr<CacheItem<T> > > >,bool>result;
+		std::pair<std::map<Key, shared_ptr<CacheItem<T> > >::iterator,bool>result;
+		result=shard->map.insert(std::pair<Key,shared_ptr<CacheItem<T> > >(id,item));	//TODO... use .emplace() once we have C++11 !! (may be faster)
+		if(!result.second){
+
+			// The value was not set, because the key already existss.
+			std::cout << "Replacing!" << std::endl;
+			shard->map.erase(id);
+			shard->map.insert(std::pair<Key,shared_ptr<CacheItem<T> > >(id,item));
+		}
 
 	};
 
+	/**
+	 * Delete a value from the cache
+	 *
+	 * @param id the key
+	 * @retval the number of items erased
+	 */
+	size_t del(Key id){
 
+		// Get shard
+		size_t index=this->calc_index(id);
+		shared_ptr<Shard<T> >shard=this->shards.at(index);
 
+		// Lock and erase
+		mutex::scoped_lock lock(*shard->guard);
+		return shard->map.erase(id);
+
+	};
 
 	/**
 	 * Get a value from the cache
