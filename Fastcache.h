@@ -82,17 +82,6 @@ public:
 	};
 
 
-	/**
-	 * Set a value into the cache
-	 *
-	 * @param id the key
-	 * @param val shared_ptr to the object to set
-	 */
-	void set(Key id, shared_ptr<T> val){
-
-		this->set(id, val, 0);
-
-	};
 
 	/**
 	 * Set a value into the cache
@@ -101,13 +90,12 @@ public:
 	 * @param val shared_ptr to the object to set
 	 * @param expiration UNIX timestamp
 	 */
-	void set(Key id, shared_ptr<T> val, time_t expiration){
+	void set(Key id, shared_ptr<T> val, time_t expiration=0){
 
 		// Get shard
 		size_t index=this->calc_index(id);
 		shared_ptr<Shard<T> >shard=this->shards.at(index);
 
-		// Create wrapper
 		shared_ptr<CacheItem<T> >item=shared_ptr<CacheItem<T> >(new CacheItem<T>(val, expiration));
 
 		// Lock and write
@@ -115,7 +103,8 @@ public:
 		#ifdef FASTCACHE_SLOW
 		sleep(1);
 		#endif
-		shard->map[id]=item;
+		shard->map.insert(std::pair<Key,shared_ptr<CacheItem<T> > >(id,item));	//TODO... use .emplace() once we have C++11 !! (may be faster)
+
 
 	};
 
