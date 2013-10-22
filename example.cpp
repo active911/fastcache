@@ -11,6 +11,10 @@ class TestClass {
 public:
 	int id;
 	string name;
+	~TestClass(){
+
+		cout << "Class dest" <<endl;
+	};
 };
 
 int main(int argc, char **argv) {

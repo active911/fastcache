@@ -5,19 +5,25 @@ DEP_HEAD := Fastcache.h
 #THRIFT_DIR := /usr/local/include/thrift
 #INC := -I$(THRIFT_DIR) -Igen-cpp/ -Iinclude/ -Iinih/ -Iinih/cpp/
 
-all: tests example
+all: test_1 test_2 test_3 example
+
+
+test: test/test_1 test/test_2 test/test_3
+	/usr/bin/perl run_tests.pl
+
+example: example.o 
+	$(CXX) $^ -o $@ -L/usr/local/lib  -lboost_thread
+
+test/test_%: test/test_%.o
+	$(CXX) $^ -o $@ -L/usr/local/lib -lboost_thread
+
+test/%.o: test/%.cpp $(DEP_HEAD)
+	$(CXX) -Wall $(INC) -c $< -o $@
 
 %.o: %.cpp $(DEP_HEAD)
 	$(CXX) -Wall $(INC) -c $< -o $@
 
-tests: test1 test2 test3
-
-test%: test/test%.cpp
-	$(CXX) $^ -o test/$@ -L/usr/local/lib -lboost_thread
-
-example: example.o 
-	$(CXX) $^ -o $@ -L/usr/local/lib 
 
 clean:
-	$(RM) *.o  test/*.o test/test1 test/test2 test/test3 example
+	$(RM) *.o  test/*.o test/test_1 test/test_2 test/test_3 example
 

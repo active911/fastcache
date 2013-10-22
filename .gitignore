@@ -1,7 +1,7 @@
 *.o
 *.cfg
-test/test1
-test/test2
-test/test3
+test/test_1
+test/test_2
+test/test_3
 test/*.o
 example

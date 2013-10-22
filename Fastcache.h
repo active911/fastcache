@@ -1,12 +1,15 @@
 
 
+#include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/functional/hash.hpp>
+#include <boost/detail/atomic_count.hpp>
 #include <vector>
 #include <map>
 #include <iostream>
+#include <time.h>
 
 // Shard size.  This should be much larger than the number of threads likely to access the cache at any one time.
 #ifndef FASTCACHE_SHARDSIZE
@@ -23,54 +26,35 @@ namespace active911 {
 template <class Key, class T>
 class Fastcache {
 
-	template <class S>	// Keep compiler happy... really will be T
-	class Fastshard {
+	/**
+	 * CacheItem
+	 * A wrapper class for cache values
+	 */
+	template <class W>
+	class CacheItem {
 	public:
-		Fastshard(){
+
+		CacheItem(shared_ptr<T> data, time_t expiration){
+
+			this->data=data;
+			this->expiration=expiration;
+		};
+
+		shared_ptr<T> data;
+		time_t expiration;
+	};
+
+	template <class S>	// Keep compiler happy... really will be T
+	class Shard {
+	public:
+		Shard(){
 
 			this->guard=shared_ptr<mutex>(new mutex());
 		};
 
-		/**
-		 * Set a value into the map
-		 *
-		 * @param id the key
-		 * @param val shared_ptr to the object to set
-		 */
-		void set(Key id, shared_ptr<T> val){
-
-			// Lock and write
-			mutex::scoped_lock lock(*this->guard);
-			#ifdef FASTCACHE_SLOW
-			sleep(1);
-			#endif
-			this->map[id]=val;
-
-		};
-		/**
-		 * Get a value from the map
-		 *
-		 * @param id the key
-		 * @retval boost::shared_ptr<T>
-		 */
-		shared_ptr<T> get(Key id){
-
-			// Lock and read
-			mutex::scoped_lock lock(*this->guard);
-			#ifdef FASTCACHE_SLOW
-			sleep(1);
-			#endif
-			shared_ptr<T>val=this->map.at(id);			// Will throw std::out_of_range if not there!
-
-			return val;
-		};
-
-	protected:
 		shared_ptr<mutex> guard;
-		std::map<Key,shared_ptr<T> > map;
-
+		std::map<Key,shared_ptr<CacheItem<T> > > map;
 	};
-
 
 public:
 
@@ -80,10 +64,24 @@ public:
 		this->shards.reserve(FASTCACHE_SHARDSIZE);
 		for(unsigned int n=0; n<FASTCACHE_SHARDSIZE; n++) {
 
-			shared_ptr<Fastshard<T> >p (new Fastshard<T>());
+			shared_ptr<Shard<T> >p (new Shard<T>());
 			this->shards.push_back(p);
 		}
+
+		// Start up the curator thread
+		this->curator_run=shared_ptr<boost::detail::atomic_count>(new boost::detail::atomic_count(1));
+		this->curator=shared_ptr<boost::thread>(new boost::thread(&Fastcache::curate, this));
 	};
+
+	~Fastcache(){
+
+		// Retire the curator
+		--(*this->curator_run);
+		this->curator->join();
+
+	};
+
+
 	/**
 	 * Set a value into the cache
 	 *
@@ -92,17 +90,38 @@ public:
 	 */
 	void set(Key id, shared_ptr<T> val){
 
-		// Get shard
-		size_t index=this->calc_index(id);
-		shared_ptr<Fastshard<T> >shard=this->shards.at(index);
-
-//		std::cout << "ptr is " << index << std::endl;
-//		std::cout << "size is" << this->shards.size() << std::endl;
-
-		// Set
-		shard->set(id, val);
+		this->set(id, val, 0);
 
 	};
+
+	/**
+	 * Set a value into the cache
+	 *
+	 * @param id the key
+	 * @param val shared_ptr to the object to set
+	 * @param expiration UNIX timestamp
+	 */
+	void set(Key id, shared_ptr<T> val, time_t expiration){
+
+		// Get shard
+		size_t index=this->calc_index(id);
+		shared_ptr<Shard<T> >shard=this->shards.at(index);
+
+		// Create wrapper
+		shared_ptr<CacheItem<T> >item=shared_ptr<CacheItem<T> >(new CacheItem<T>(val, expiration));
+
+		// Lock and write
+		mutex::scoped_lock lock(*shard->guard);
+		#ifdef FASTCACHE_SLOW
+		sleep(1);
+		#endif
+		shard->map[id]=item;
+
+	};
+
+
+
+
 	/**
 	 * Get a value from the cache
 	 *
@@ -113,13 +132,34 @@ public:
 
 		// Get shard
 		size_t index=this->calc_index(id);
-		shared_ptr<Fastshard<T> >shard=this->shards.at(index);
+		shared_ptr<Shard<T> >shard=this->shards.at(index);
 
-		// Get var
-		return shard->get(id);
+		// Lock and read
+		mutex::scoped_lock lock(*shard->guard);
+		#ifdef FASTCACHE_SLOW
+		sleep(1);
+		#endif
+		shared_ptr<CacheItem<T> >item=shard->map.at(id);			// Will throw std::out_of_range if not there!
+
+		return item->data;
 	};
 
 	protected:
+
+	/**
+	 * We are the curator
+	 *
+	 * Purge expired keys, etc
+	 */
+	void curate(){
+
+		while(*this->curator_run) {
+
+			sleep(1);
+		}
+
+	};
+
 
 	/**
 	 * Calculate the shard index
@@ -134,8 +174,11 @@ public:
 		return (size_t) this->hash(id) % FASTCACHE_SHARDSIZE;
 	};
 
+
 	boost::hash<Key>hash;
-	std::vector<shared_ptr<Fastshard<T> > > shards;
+	std::vector<shared_ptr<Shard<T> > > shards;
+	shared_ptr<boost::thread>curator;
+	shared_ptr<boost::detail::atomic_count>curator_run;
 
 
 };
