@@ -46,7 +46,7 @@ void load_cache(int thread_number) {
 	// Create a cache object 
 	for(int n=0; n<OBJECT_COUNT; n++){
 
-		int key=thread_number*n;
+		int key=(thread_number*1000000)+n;
 		shared_ptr<TestClass>obj=shared_ptr<TestClass>(new TestClass());
 		cache.set(key, obj);
 	}
@@ -58,7 +58,7 @@ void read_cache(int thread_number) {
 	// Read 
 	for(int n=0; n<OBJECT_COUNT; n++){
 
-		int key=thread_number*n;
+		int key=(thread_number*1000000)+n;
 		shared_ptr<TestClass>obj=cache.get(key);
 //		assert(obj->name.compare(s.str())==0);
 	}

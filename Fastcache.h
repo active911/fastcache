@@ -7,9 +7,10 @@
 #include <boost/functional/hash.hpp>
 #include <boost/detail/atomic_count.hpp>
 #include <vector>
-#include <iterator>
+//#include <iterator>
 #include <map>
 #include <iostream>
+//#include <utility>
 #include <time.h>
 
 // Shard size.  This should be much larger than the number of threads likely to access the cache at any one time.
@@ -17,11 +18,23 @@
 	#define FASTCACHE_SHARDSIZE 256u
 #endif
 
+#ifndef FASTCACHE_CURATOR_SLEEP_MS
+	#define FASTCACHE_CURATOR_SLEEP_MS 30000u
+#endif
+
 using boost::shared_ptr;
 using boost::mutex;
 
 
 namespace active911 {
+
+// Write modes
+enum fastcache_writemode {
+
+	FASTCACHE_WRITEMODE_WRITE_ALWAYS,
+	FASTCACHE_WRITEMODE_ONLY_WRITE_IF_SET,
+	FASTCACHE_WRITEMODE_ONLY_WRITE_IF_NOT_SET
+};	
 
 
 template <class Key, class T>
@@ -41,6 +54,25 @@ class Fastcache {
 			this->expiration=expiration;
 		};
 
+		/**
+		 * Have we expired?
+		 * 
+		 * @retval bool
+		 */
+		bool expired(){
+
+			// If we have no expiration, the answer is easy
+			if(this->expiration==0) {
+
+				return false;
+			}
+
+			// Get the time and compare
+			struct timespec time;
+			clock_gettime(CLOCK_REALTIME, &time);
+			return (time.tv_sec > this->expiration);
+		};
+
 		shared_ptr<T> data;
 		time_t expiration;
 	};
@@ -52,6 +84,25 @@ class Fastcache {
 
 			this->guard=shared_ptr<mutex>(new mutex());
 		};
+
+		void cull_expired_keys() {
+
+			// Iterate map.  Somehow this is ok to do even though we are deleting stuff?
+			for(typename std::map<Key,shared_ptr<CacheItem<T> > >::iterator it=this->map.begin();it != this->map.end();/* no increment */){
+
+				shared_ptr<CacheItem<T> >item=it->second;
+
+				if(item->expired()){
+
+					this->map.erase(it++);
+
+				} else {
+
+					++it;
+				}
+			}
+
+		}
 
 		shared_ptr<mutex> guard;
 		std::map<Key,shared_ptr<CacheItem<T> > > map;
@@ -78,11 +129,37 @@ public:
 
 		// Retire the curator
 		--(*this->curator_run);
+		this->curator->interrupt();
 		this->curator->join();
 
 	};
 
+	/**
+	 * Get some metrics
+	 *
+	 * @retval 
+	 */
+	size_t metrics() {
 
+		size_t total_size=0;
+
+		// Iterate all objects in cache
+		for(typename std::vector<shared_ptr<Shard<T> > >::iterator it=this->shards.begin(); it != this->shards.end(); ++it) {
+
+			shared_ptr<Shard<T> >shard=*it;
+
+			{	// Scope for lock
+				mutex::scoped_lock lock(*shard->guard);
+
+				//  tally
+				total_size+=shard->map.size();
+			}
+
+		}
+
+		return total_size;
+
+	};
 
 	/**
 	 * Set a value into the cache
@@ -90,8 +167,10 @@ public:
 	 * @param id the key
 	 * @param val shared_ptr to the object to set
 	 * @param expiration UNIX timestamp
+	 * @param mode the write mode
+	 * @retval number of items written
 	 */
-	void set(Key id, shared_ptr<T> val, time_t expiration=0){
+	size_t set(Key id, shared_ptr<T> val, time_t expiration=0, const fastcache_writemode mode=FASTCACHE_WRITEMODE_WRITE_ALWAYS){
 
 		// Get shard
 		size_t index=this->calc_index(id);
@@ -105,18 +184,56 @@ public:
 		sleep(1);
 		#endif
 
-//std::map<Key,shared_ptr<CacheItem<T> > >::iterator
+		if(mode==FASTCACHE_WRITEMODE_ONLY_WRITE_IF_SET) {
 
-//		std::pair<std::iterator<std::pair<Key, shared_ptr<CacheItem<T> > > >,bool>result;
-		std::pair<std::map<Key, shared_ptr<CacheItem<T> > >::iterator,bool>result;
+			if(shard->map.find(id) == shard->map.end()) {			
+
+				// Key not found.  Return.
+				return 0;	
+
+			} else {
+
+				// Erase it so we can set it below
+				shard->map.erase(id);				
+			}
+		} 
+
+		std::pair<typename std::map<Key, shared_ptr<CacheItem<T> > >::iterator,bool>result;
 		result=shard->map.insert(std::pair<Key,shared_ptr<CacheItem<T> > >(id,item));	//TODO... use .emplace() once we have C++11 !! (may be faster)
-		if(!result.second){
+		if(!result.second) {
 
-			// The value was not set, because the key already existss.
-			std::cout << "Replacing!" << std::endl;
-			shard->map.erase(id);
-			shard->map.insert(std::pair<Key,shared_ptr<CacheItem<T> > >(id,item));
+			// Key exists, so nothing was written
+			if(mode==FASTCACHE_WRITEMODE_ONLY_WRITE_IF_NOT_SET){
+
+				return 0;
+
+			} else {
+
+				// Erase and re-write
+				shard->map.erase(id);
+				shard->map.insert(std::pair<Key,shared_ptr<CacheItem<T> > >(id,item));
+				return 1;
+			}
 		}
+
+		return 1;
+	};
+
+	/**
+	 * Find if a key exists
+	 *
+	 * @param id the key
+	 * @retval 1 if the key exists, 0 otherwise
+	 */
+	size_t exists(Key id){
+
+		// Get shard
+		size_t index=this->calc_index(id);
+		shared_ptr<Shard<T> >shard=this->shards.at(index);
+
+		// Lock and check
+		mutex::scoped_lock lock(*shard->guard);
+		return (shard->map.find(id) == shard->map.end())?0:1;
 
 	};
 
@@ -141,8 +258,10 @@ public:
 	/**
 	 * Get a value from the cache
 	 *
+	 * Does not throw for invalid keys (returns empty pointer)
+	 *
 	 * @param id the key
-	 * @retval boost::shared_ptr<T>
+	 * @retval boost::shared_ptr<T>.  ==empty pointer if nonexistent or expired.
 	 */
 	shared_ptr<T> get(Key id){
 
@@ -155,9 +274,22 @@ public:
 		#ifdef FASTCACHE_SLOW
 		sleep(1);
 		#endif
-		shared_ptr<CacheItem<T> >item=shard->map.at(id);			// Will throw std::out_of_range if not there!
+		try {
+	
+			shared_ptr<CacheItem<T> >item=shard->map.at(id);			// Will throw std::out_of_range if not there!
 
-		return item->data;
+			// Check for expired
+			if(item->expired()){
+
+				return shared_ptr<T>();
+			}
+
+			// Success. 
+			return item->data;
+
+		} catch (std::exception& e) {}
+
+		return shared_ptr<T>();		// Empty
 	};
 
 	protected:
@@ -171,9 +303,35 @@ public:
 
 		while(*this->curator_run) {
 
-			sleep(1);
-		}
+			try {
 
+				// Snooze a little
+				boost::this_thread::sleep(boost::posix_time::milliseconds(FASTCACHE_CURATOR_SLEEP_MS));
+
+				// Iterate all objects in cache, checking for expired objects
+				for(typename std::vector<shared_ptr<Shard<T> > >::iterator it=this->shards.begin(); it != this->shards.end(); ++it) {
+
+					shared_ptr<Shard<T> >shard=*it;
+
+					{	// Scope for lock
+						mutex::scoped_lock lock(*shard->guard);
+
+						// Cull expired keys
+						shard->cull_expired_keys();
+					}
+
+				}
+
+			} catch(boost::thread_interrupted& e) {
+
+				// We were asked to leave?
+				return;
+
+			} catch(std::exception& e) {
+
+				// TODO... something bad happened in the curator thread
+			}
+		}
 	};
 
 

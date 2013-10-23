@@ -5,10 +5,10 @@ DEP_HEAD := Fastcache.h
 #THRIFT_DIR := /usr/local/include/thrift
 #INC := -I$(THRIFT_DIR) -Igen-cpp/ -Iinclude/ -Iinih/ -Iinih/cpp/
 
-all: test_1 test_2 test_3 example
+all: test_1 test_2 test_3 test_4 test_5 example
 
 
-test: test/test_1 test/test_2 test/test_3
+test: test/test_1 test/test_2 test/test_3 test/test_4 test/test_5
 	/usr/bin/perl run_tests.pl
 
 example: example.o 
