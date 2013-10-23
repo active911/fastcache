@@ -96,7 +96,7 @@ then you can run ```make```
 
 ### Configuration
 
-- setting FASTCACHE_CURATOR_SLEEP_MS will change how often the curator thread collects garbage.  This won't have an effect on key expiration, just memory usage.  The default setting is 30000 (30 seconds).  If your cache is large, you might make this number larger since it has to traverse the whole cache every time it does its job.
+- setting FASTCACHE_CURATOR_SLEEP_MS will change how often the curator thread collects garbage.  This won't have an effect on key expiration, it just means it will be a little lazier with the memory usage (++ performance though).  The default setting is 30000 (30 seconds).  If your cache is large, you might make this number larger since it has to traverse the whole cache every time it does its job.
 - FASTCACHE_SHARDSIZE may need to be increased if you have a large number of threads accessing the cache.  It will use only a little more memory, but should really help in keeping shard contention low.  Make sure you only set it to a power of two so hash modulus can be calculated easily!
 
 
