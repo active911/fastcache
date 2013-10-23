@@ -5,8 +5,8 @@ Wicked fast, thread safe in-memory key/object store for C++
 ```
 Testing with 30 simultaneous threads
 Object size is 16 bytes
-Loading up cache...30000 objects stored in 0.027752 sec
-Reading cache...30000 objects read in 0.017265 sec
+Loading up cache...30000 objects stored in 0.041198 sec
+Reading cache...30000 objects read in 0.0038482 sec
 ```
 
 ### Introduction
@@ -85,8 +85,28 @@ int main(int argc, char **argv) {
 }
 ```
 
+### Installation
+
+On Debian, you will need to run the following 
+```
+apt-get install build-essential libboost-dev libboost-thread-dev
+ldconfig
+```
+then you can run ```make```
+
+### Configuration
+
+- setting FASTCACHE_CURATOR_SLEEP_MS will change how often the curator thread collects garbage.  This won't have an effect on key expiration, just memory usage.  The default setting is 30000 (30 seconds).  If your cache is large, you might make this number larger since it has to traverse the whole cache every time it does its job.
+- FASTCACHE_SHARDSIZE may need to be increased if you have a large number of threads accessing the cache.  It will use only a little more memory, but should really help in keeping shard contention low.  Make sure you only set it to a power of two so hash modulus can be calculated easily!
+
+
 ### Todo
 
-Enforce non mutablility of objects in the cache somehow - perhaps add functions that copy data before and after storage, so as to relieve the user from haing to be careful? OTOH, there would be performance tradeoffs here...
+- Enforce non mutablility of objects in the cache somehow - perhaps add functions that copy data before and after storage, so as to relieve the user from haing to be careful? OTOH, there would be performance tradeoffs here...
+- exists() will return false positive if there is an expired value in the cache
+- document the function calls
 
-Make Tests!
+
+
+
+
