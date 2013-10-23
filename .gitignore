@@ -3,5 +3,7 @@
 test/test_1
 test/test_2
 test/test_3
+test/test_4
+test/test_5
 test/*.o
 example
