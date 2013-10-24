@@ -227,14 +227,6 @@ public:
 	 */
 	size_t exists(Key id){
 
-		// Get shard
-/*		size_t index=this->calc_index(id);
-		shared_ptr<Shard<T> >shard=this->shards.at(index);
-
-		// Lock and check
-		mutex::scoped_lock lock(*shard->guard);
-		return (shard->map.find(id) == shard->map.end())?0:1;
-*/
 		return (this->get(id))?1:0;		// So we don't get false positives on expired keys
 
 	};
@@ -283,6 +275,8 @@ public:
 			// Check for expired
 			if(item->expired()){
 
+				// It's expired.  Erase it and return empty.
+				shard->map.erase(id);
 				return shared_ptr<T>();
 			}
 
