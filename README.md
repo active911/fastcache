@@ -100,13 +100,6 @@ then you can run ```make```
 - FASTCACHE_SHARDSIZE may need to be increased if you have a large number of threads accessing the cache.  It will use only a little more memory, but should really help in keeping shard contention low.  Make sure you only set it to a power of two so hash modulus can be calculated easily!
 
 
-### Todo
-
-- Enforce non mutablility of objects in the cache somehow - perhaps add functions that copy data before and after storage, so as to relieve the user from haing to be careful? OTOH, there would be performance tradeoffs here...
-- exists() will return false positive if there is an expired value in the cache
-- document the function calls
-
-
 
 
 
