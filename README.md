@@ -9,6 +9,12 @@ Loading up cache...30000 objects stored in 0.041198 sec
 Reading cache...30000 objects read in 0.0038482 sec
 ```
 
+### Features
+
+- Did I mention fast?
+- Thread safe
+- Apache 2.0 license
+
 ### Introduction
 
 Sometimes using an external caching solution like memcached or Redis is just unnecessary. 
