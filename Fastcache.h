@@ -7,6 +7,7 @@
 #include <boost/functional/hash.hpp>
 #include <boost/detail/atomic_count.hpp>
 #include <vector>
+#include <exception>
 //#include <iterator>
 #include <map>
 #include <iostream>
@@ -36,6 +37,14 @@ enum fastcache_writemode {
 	FASTCACHE_WRITEMODE_ONLY_WRITE_IF_NOT_SET
 };	
 
+
+struct FastcacheObjectLocked : std::exception { 
+
+	char const* what() const throw() {
+
+		return "Object is currently locked";
+	}; 
+};
 
 template <class Key, class T>
 class Fastcache {
@@ -256,6 +265,7 @@ public:
 	 *
 	 * @param id the key
 	 * @retval boost::shared_ptr<T>.  ==empty pointer if nonexistent or expired.
+	 * @throws FastcacheObjectLocked if #FASTCACHE_MUTABLE_DATA is set and object is in use
 	 */
 	shared_ptr<T> get(Key id){
 
@@ -263,14 +273,21 @@ public:
 		size_t index=this->calc_index(id);
 		shared_ptr<Shard<T> >shard=this->shards.at(index);
 
-		// Lock and read
+		// Lock
 		mutex::scoped_lock lock(*shard->guard);
+
+		// Delay if in slow mode...
 		#ifdef FASTCACHE_SLOW
 		sleep(1);
 		#endif
+
+
+		// OK, we now have exclusive access to the shard.  So no race condition is possible for the affections of this item...
+		shared_ptr<CacheItem<T> >item;
+
 		try {
 	
-			shared_ptr<CacheItem<T> >item=shard->map.at(id);			// Will throw std::out_of_range if not there!
+			item=shard->map.at(id);			// Will throw std::out_of_range if not there!
 
 			// Check for expired
 			if(item->expired()){
@@ -280,12 +297,20 @@ public:
 				return shared_ptr<T>();
 			}
 
-			// Success. 
-			return item->data;
+		} catch (std::exception& e) {
 
-		} catch (std::exception& e) {}
+			return shared_ptr<T>();		// Return empty since it wasn't found
+		}
 
-		return shared_ptr<T>();		// Empty
+		// If we are allowing mutables, make sure no one else is using this data!
+		#ifdef FASTCACHE_MUTABLE_DATA
+		if(!item->data.unique()){
+
+			throw FastcacheObjectLocked();
+		}
+		#endif
+
+		return item->data;
 	};
 
 	protected:

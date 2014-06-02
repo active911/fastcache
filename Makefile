@@ -8,7 +8,7 @@ DEP_HEAD := Fastcache.h
 all: test example
 
 
-test: test/test_1 test/test_2 test/test_3 test/test_4 test/test_5
+test: test/test_1 test/test_2 test/test_3 test/test_4 test/test_5 test/test_6
 	/usr/bin/perl run_tests.pl
 
 example: example.o 
@@ -25,5 +25,5 @@ test/%.o: test/%.cpp $(DEP_HEAD)
 
 
 clean:
-	$(RM) *.o  test/*.o test/test_1 test/test_2 test/test_3 test/test_4 test/test_5 example
+	$(RM) *.o  test/*.o test/test_1 test/test_2 test/test_3 test/test_4 test/test_5 test/test_6 example
 

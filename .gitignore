@@ -7,3 +7,4 @@ test/test_4
 test/test_5
 test/*.o
 example
+.DS_Store

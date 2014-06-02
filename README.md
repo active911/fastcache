@@ -25,7 +25,7 @@ No, think about it.  Key/value stores are great if...
 
 - You need to access cached data from several different forward-facing servers
 - Your code is written in PHP or something non-persistent (request based)
-- You need aging, clustering, etc
+- You clustering
 
 On the other hand, what if you...
 
@@ -47,11 +47,19 @@ fastcache is a template class.  So you can store anything in it, and you can use
 
 The design challenge was to not just store data, but to do so in a way that multiple threads could access it concurrently with a minimum of blocking.  Obviously, we could use a single large std::map and then mutex it, but we would have a ton of threads all waiting on each other.  Instead, we shard the cache into M maps.  We then use a hash function to calculate which map (shard) will hold a particular piece of data.  For T concurrent threads reading or writing data, we will have (mostly) non blocking operation as long as our hash generates an even distribution and M >> T.  T defaults to 256 but can be changed by setting FASTCACHE_SHARDSIZE.
 
-Objects are passed to and from the cache wrapped in boost::shared_ptr.  This means that you can get an object from the cache and hold onto it as long as you like without fear of blocking other threads.  If the object is changed in the meantime (i.e., replaced - actual mutations within the cache are not supported!) your copy will remain safe.
+Objects are passed to and from the cache wrapped in boost::shared_ptr. Create all cache objects using boost::shared_ptr and then let them go out of scope as soon as you set them.
 
-Again, DON'T MUTATE anything you put into or take out of the cache!! This is very important to avoid trouble with multiple threads.  
-- Create all cache objects using boost::shared_ptr and then let them go out of scope as soon as you set them
-- When you get something from the cache, make a copy of the data (not just the pointer) before you do anything except read it
+When in mutable mode (see below), we use the ```.unique()``` method of boost::shared_ptr in order to see if we have a lock.  **When operating in this mode, do not add the same object to the cache twice!** Doing so will make the cache think the object is in use.  You will then get a FastcacheObjectLocked exception every time you attempt to ```.get()``` it. 
+
+### Operational modes
+
+The cache runs in one of two modes, depending on whether you ```#define FASTCACHE_MUTABLE_DATA```:
+
+- Default mode - This means that you can get an object from the cache and hold onto it as long as you like without fear of blocking other threads.  If the object is changed in the meantime (i.e., replaced - actual mutations within the cache are not supported!) your copy will remain safe.  You cannot mutate the object itself.  This is the faster of the two modes
+- Mutable mode, where ```FASTCACHE_MUTABLE_DATA``` is defined.  In this mode, you have a lock on the data as long as your share_ptr is valid.  The lock does not keep the object from being removed from the cache, it just means you have an exclusive read/write lock on the object itself.  Another attempt to read the data will result in a FastcacheObjectLocked exception.  Since the shard is locked while a ```get()``` operation is taking place, Fastcache itself cannot just block in this case (it would block all operations on the entire shard!).  It is YOUR responsibility in this case to ```catch()``` the exception, sleep, retry, etc.  In mutable mode, you must be careful to make sure object references go out of scope as soon as possible so you don't block other requests.  Obviously, this mode will be a little slower than non-mutable mode. 
+
+Again, DON'T MUTATE anything you put into or take out of the cache, unless you have #defined ```FASTCACHE_MUTABLE_DATA```!! This is very important to avoid trouble with multiple threads.  When you get something from the cache, make a copy of the data (not just the pointer) before you do anything except read it
+
 
 ### Example
 
